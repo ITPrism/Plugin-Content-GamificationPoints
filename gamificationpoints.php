@@ -50,17 +50,18 @@ class plgContentGamificationPoints extends JPlugin
 
         // Check document type
         $docType = $doc->getType();
-        if (strcmp("html", $docType) != 0) {
+        if (strcmp('html', $docType) !== 0) {
             return null;
         }
 
-        if (strcmp($context, "com_content.article") != 0 or $this->isRestricted()) {
+        if (strcmp($context, 'com_content.article') !== 0 or $this->isRestricted()) {
             return null;
         }
 
-        $userId = JFactory::getUser()->get("id");
-        if (!empty($userId)) {
-            $this->givePoints($userId, JFactory::getUser()->get("name"), $article);
+        $user   = JFactory::getUser();
+        $userId = $user->get('id');
+        if ($userId > 0) {
+            $this->givePoints($userId, $user->get('name'), $article);
         }
     }
 
@@ -73,10 +74,9 @@ class plgContentGamificationPoints extends JPlugin
     {
         $restricted = true;
 
-        switch ($this->app->input->getCmd("option")) {
-
-            case "com_content":
-                $restricted = $this->isRestrictedContent($this->app->input->getCmd("view"), $this->app->input->getCmd("task"));
+        switch ($this->app->input->getCmd('option')) {
+            case 'com_content':
+                $restricted = $this->isRestrictedContent($this->app->input->getCmd('view'), $this->app->input->getCmd('task'));
                 break;
         }
 
@@ -85,11 +85,7 @@ class plgContentGamificationPoints extends JPlugin
 
     protected function isRestrictedContent($view, $task)
     {
-        if (strcmp("article", $view) == 0) {
-            return false;
-        }
-
-        return true;
+        return !(strcmp('article', $view) === 0);
     }
 
     /**
@@ -97,114 +93,154 @@ class plgContentGamificationPoints extends JPlugin
      *
      * @param int $userId
      * @param string $name User name
-     * @param object $article
+     * @param stdClass $article
+     *
+     * @throws \RuntimeException
+     * @throws \InvalidArgumentException
+     * @throws \UnexpectedValueException
+     * @throws \OutOfBoundsException
      */
-    protected function givePoints($userId, $name, $article)
+    protected function givePoints($userId, $name, &$article)
     {
-        $pointsTypesValues = $this->params->get("points_types", 0);
+        $pointsTypesValues = $this->params->get('points_types', 0);
 
         // Parse point types
         $pointsTypes = array();
-        if (!empty($pointsTypesValues)) {
+        if (is_string($pointsTypesValues) and $pointsTypesValues !== '') {
             $pointsTypes = json_decode($pointsTypesValues, true);
             Joomla\Utilities\ArrayHelper::toInteger($pointsTypes);
         }
 
-        if (!empty($pointsTypes)) {
+        if (count($pointsTypes) > 0) {
+            $uri    = JUri::getInstance();
+            $domain = $uri->getScheme(). '://'. $uri->getHost();
 
-            $uri = JUri::getInstance();
-            $domain = $uri->getScheme(). "://". $uri->getHost();
+            $params = JComponentHelper::getParams('com_gamification');
+
+            $activityService = $params->get('integration_activities');
+            $activityStates  = $this->params->get('store_activity');
+            $activityStates  = Joomla\Utilities\ArrayHelper::toInteger($activityStates);
+
+            $notificationService = $params->get('integration_notifications');
+            $notificationStates  = $this->params->get('send_notification');
+            $notificationStates  = Joomla\Utilities\ArrayHelper::toInteger($notificationStates);
+
+            $integrationOptions = new \Joomla\Registry\Registry(array(
+                'platform' => '',
+                'user_id'  =>  $userId,
+                'title'    =>  $article->title,
+                'url'      =>  $domain.$article->readmore_link,
+                'app'      => 'gamification.points'
+            ));
 
             foreach ($pointsTypes as $pointsType) {
-                $pointsType["value"] = (int)$pointsType["value"];
+                $pointsType['value'] = (int)$pointsType['value'];
 
                 // If there are no points for giving, continue for next one.
-                if (!$pointsType["value"]) {
+                if (!$pointsType['value']) {
                     continue;
                 }
 
-                $points = Gamification\Points\Points::getInstance(JFactory::getDbo(), $pointsType["id"]);
+                $keys = array(
+                    'user_id'   => $userId,
+                    'points_id' => $pointsType['id']
+                );
+
+                $container    = Prism\Container::getContainer();
+                $containerKey = Prism\Utilities\StringHelper::generateMd5Hash(Gamification\Points\Points::class, $pointsType['id']);
+
+                // Get basic points object.
+                if (!$container->exists($containerKey)) {
+                    $points     = new Gamification\Points\Points(JFactory::getDbo());
+                    $points->load($pointsType['id']);
+
+                    $container->set($containerKey, $points);
+                } else {
+                    $points = $container->get($containerKey);
+                }
 
                 if ($points->getId() and $points->isPublished()) {
+                    // Get user points object.
+                    $userPoints = new Gamification\User\Points\Points(JFactory::getDbo());
+                    $userPoints->setContainer($container);
+                    $userPoints->load($keys);
 
-                    $keys = array(
-                        "hash" => md5($userId . ":" . $article->id . ":" . $pointsType["id"])
-                    );
+                    // Create a record if it does not exist.
+                    if (!$userPoints->getId()) {
+                        $userPoints->startCollectingPoints($keys);
+                    }
 
-                    // Check for already given points.
-                    if (!$this->params->get("enable_debug", 0)) {
+                    $context = 'com_content.read.article';
+                    
+                    $hash = md5($userId . ':' . $article->id . ':' . $pointsType['id']);
+                    $keys = array('hash' => $hash);
+
+                    // Check for has already given points.
+                    if (!$this->isDebugging()) {
                         $pointsHistory = new Gamification\Points\History(JFactory::getDbo());
                         if (!$pointsHistory->isExists($keys)) {
                             $pointsHistory->setUserId($userId);
-                            $pointsHistory->setPointsId($pointsType["id"]);
-                            $pointsHistory->setPoints($pointsType["value"]);
-                            $pointsHistory->setHash(md5($userId . ":" . $article->id . ":" . $pointsType["id"]));
+                            $pointsHistory->setPointsId($pointsType['id']);
+                            $pointsHistory->setPoints($pointsType['value']);
+                            $pointsHistory->setContext($context);
+                            $pointsHistory->setHash($hash);
                             $pointsHistory->store();
                         } else {
                             continue;
                         }
                     }
 
-                    $keys = array(
-                        "user_id"   => $userId,
-                        "points_id" => $points->getId()
-                    );
-
-                    $userPoints = new Gamification\User\Points(JFactory::getDbo());
-                    $userPoints->load($keys);
-
-                    // Create an record if it does not exists.
-                    if (!$userPoints->getId()) {
-                        $userPoints->startCollectingPoints($keys);
-                    }
-
                     // Increase user points.
-                    $options = array(
-                        "context" => "com_content.article"
-                    );
-
-                    $userPoints->increase($pointsType["value"], $options);
+                    
+                    $userPointsManager = new Gamification\User\Points\PointsManager(JFactory::getDbo());
+                    $userPointsManager->setPoints($userPoints);
+                    
+                    $userPointsManager->increase($context, $pointsType['value']);
 
                     // Send notification and store activity.
 
-                    $params = JComponentHelper::getParams("com_gamification");
-
-                    $options = array(
-                        "social_platform" => "",
-                        "user_id" => $userId,
-                        "title" =>  $article->title,
-                        "url"   =>  $domain.$article->readmore_link,
-                        "app"   => "gamification.points"
-                    );
-
                     // Store activity.
-                    $activityService = $params->get("integration_activities");
-                    if ($this->params->get("store_activity", 0) and !empty($activityService)) {
+                    if (in_array((int)$pointsType['id'], $activityStates, true) and $activityService !== '') {
+                        $integrationOptions->set('platform', $activityService);
 
-                        $options["social_platform"] = $activityService;
+                        $points = htmlspecialchars($pointsType['value'] . ' ' . $userPoints->getPoints()->getTitle(), ENT_QUOTES, 'UTF-8');
+                        $notice = JText::sprintf('PLG_CONTENT_GAMIFICATIONPOINTS_ACTIVITY_READ_ARTICLE', $name, $points);
 
-                        $points = htmlspecialchars($pointsType["value"] . " " . $userPoints->getTitle(), ENT_QUOTES, "UTF-8");
-                        $notice = JText::sprintf("PLG_CONTENT_GAMIFICATIONPOINTS_ACTIVITY_READ_ARTICLE", $name, $points);
-
-                        Gamification\Helper::storeActivity($notice, $options);
+                        Gamification\Helper::storeActivity($notice, $integrationOptions);
                     }
 
                     // Send notifications.
-                    $notificationService = $params->get("integration_notifications");
-                    if ($this->params->get("send_notification", 0) and !empty($notificationService)) {
+                    if (in_array((int)$pointsType['id'], $notificationStates, true) and $notificationService !== '') {
+                        $integrationOptions->set('platform', $notificationService);
 
-                        $options["social_platform"] = $notificationService;
+                        $points = htmlspecialchars($pointsType['value'] . ' ' . $userPoints->getPoints()->getTitle(), ENT_QUOTES, 'UTF-8');
+                        $message = JText::sprintf('PLG_CONTENT_GAMIFICATIONPOINTS_NOTIFICATION_READ_ARTICLE', $points, $article->title);
 
-                        $points = htmlspecialchars($pointsType["value"] . " " . $userPoints->getTitle(), ENT_QUOTES, "UTF-8");
-                        $message = JText::sprintf("PLG_CONTENT_GAMIFICATIONPOINTS_NOTIFICATION_READ_ARTICLE", $points, $article->title);
-
-                        Gamification\Helper::sendNotification($message, $options);
+                        Gamification\Helper::sendNotification($message, $integrationOptions);
                     }
-
                 }
             }
         }
     }
 
+    /**
+     * Check if debug mode is enabled and it is allowed to debug the system by current user.
+     *
+     * @return bool
+     */
+    protected function isDebugging()
+    {
+        if ($this->params->get('enable_debug', 0)) {
+            $u = JFactory::getUser();
 
+            $filterGroups = (array)$this->params->get('filter_groups', array());
+            $userGroups   = $u->getAuthorisedGroups();
+
+            $result = array_intersect($filterGroups, $userGroups);
+
+            return (bool)(count($result) > 0);
+        }
+
+        return false;
+    }
 }

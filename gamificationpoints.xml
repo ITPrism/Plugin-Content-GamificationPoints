@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<extension version="3.4" type="plugin" group="content" method="upgrade">
+<extension version="3.5" type="plugin" group="content" method="upgrade">
     <name>PLG_CONTENT_GAMIFICATIONPOINTS</name>
     <author>Todor Iliev</author>
-    <copyright>Copyright (C) 2015 Todor Iliev ( ITPrism.com ). All rights reserved.</copyright>
-    <license>http://www.gnu.org/copyleft/gpl.html GNU/GPL</license>
+    <copyright>Copyright (C) 2016 Todor Iliev ( ITPrism.com ). All rights reserved.</copyright>
+    <license>http://www.gnu.org/licenses/gpl-3.0.en.html GNU/GPLv3</license>
     <authorEmail>todor@itprism.com</authorEmail>
     <authorUrl>http://itprism.com</authorUrl>
-    <version>1.0</version>
-    <creationDate>31 August, 2015</creationDate>
+    <version>1.1</version>
+    <creationDate>10 July, 2016</creationDate>
     <description><![CDATA[
     <p>Gamification Points is a plug-in that give points to users when they read an article.</p>
     <p><a href="http://itprism.com/" target="_blank">Subscribe for the newsletter</a> to receive information about updates and new ITPrism extensions.</p>
@@ -23,29 +23,11 @@
 		<fields name="params">
             <fieldset name="basic" addfieldpath="/administrator/components/com_gamification/models/fields">
                 <field name="points_types" type="gfypointstypes" label="PLG_CONTENT_GAMIFICATIONPOINTS_TYPES" description="PLG_CONTENT_GAMIFICATIONPOINTS_TYPES_DESC" />
-                <field name="store_activity" type="radio" default="0" label="PLG_CONTENT_GAMIFICATIONPOINTS_STORE_ACTIVITY" description="PLG_CONTENT_GAMIFICATIONPOINTS_STORE_ACTIVITY_DESC" class="btn-group">
-                    <option value="0">JNO</option>
-                    <option value="1">JYES</option>
-                </field>
-                <field name="send_notification" type="radio" default="0" label="PLG_CONTENT_GAMIFICATIONPOINTS_SEND_NOTIFICATION" description="PLG_CONTENT_GAMIFICATIONPOINTS_SEND_NOTIFICATION_DESC" class="btn-group">
-                    <option value="0">JNO</option>
-                    <option value="1">JYES</option>
-                </field>
-                <field name="enable_debug" type="radio" default="0" label="PLG_CONTENT_GAMIFICATIONPOINTS_ENABLE_DEBUG" description="PLG_CONTENT_GAMIFICATIONPOINTS_ENABLE_DEBUG_DESC" class="btn-group">
-                    <option value="0">JNO</option>
-                    <option value="1">JYES</option>
-                </field>
             </fieldset>
 
             <fieldset name="integration" label="PLG_CONTENT_GAMIFICATIONPOINTS_INTEGRATION">
-                <field name="store_activity" type="radio" default="0" label="PLG_CONTENT_GAMIFICATIONPOINTS_STORE_ACTIVITY" description="PLG_CONTENT_GAMIFICATIONPOINTS_STORE_ACTIVITY_DESC" class="btn-group">
-                    <option value="0">JNO</option>
-                    <option value="1">JYES</option>
-                </field>
-                <field name="send_notification" type="radio" default="0" label="PLG_CONTENT_GAMIFICATIONPOINTS_SEND_NOTIFICATION" description="PLG_CONTENT_GAMIFICATIONPOINTS_SEND_NOTIFICATION_DESC" class="btn-group">
-                    <option value="0">JNO</option>
-                    <option value="1">JYES</option>
-                </field>
+                <field name="store_activity" type="gfypoints" multiple="true" label="PLG_CONTENT_GAMIFICATIONPOINTS_STORE_ACTIVITY" description="PLG_CONTENT_GAMIFICATIONPOINTS_STORE_ACTIVITY_DESC" />
+                <field name="send_notification" type="gfypoints" multiple="true" label="PLG_CONTENT_GAMIFICATIONPOINTS_SEND_NOTIFICATION" description="PLG_CONTENT_GAMIFICATIONPOINTS_SEND_NOTIFICATION_DESC" />
             </fieldset>
 
             <fieldset name="advanced">
@@ -53,6 +35,12 @@
                     <option value="0">JNO</option>
                     <option value="1">JYES</option>
                 </field>
+                <field name="filter_groups" type="usergrouplist"
+                       description="PLG_CONTENT_GAMIFICATIONPOINTS_FIELD_ALLOWED_GROUPS_DESC"
+                       label="PLG_CONTENT_GAMIFICATIONPOINTS_FIELD_ALLOWED_GROUPS_LABEL"
+                       multiple="true"
+                       size="10"
+                />
             </fieldset>
         </fields>
 	</config>

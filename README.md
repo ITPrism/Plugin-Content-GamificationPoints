@@ -1,6 +1,6 @@
 Content - Gamification Points
 ==========================
-( Version 1.0 )
+( Version 1.1 )
 - - -
 
 Gamification Points is a plug-in that give points (units) to users when they read an article.
@@ -10,3 +10,6 @@ You can [download Content - Gamification Points] (http://itprism.com/free-joomla
 
 Changelog
 ---------
+
+v1.1
+* Reworked to meet changes in v2.1 of the gamification platform.
